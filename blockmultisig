@@ -1,0 +1,25 @@
+#!/bin/bash
+pubk=('03d26bfbaed9c1a283bba4a06cf50194c550c47b403ef8a91dbce7c78bb8096e32' '03f4b539f127b640212a671a64fd6964fdb2bfec16629fe0a717fbf092dc92a860' '028e3b41c094b710a7553ec2bb0407d312d595dfa9b79ea6c8883646ef6815361c' '03511c0f9afd27f1897fcbf8f69fcf1be2bd5018d409408016fa2eddebd3e284d2' '03a10859d11b83f1c55aacd9c7b4b6125bf1911aed794e065b2411016a6effdade')
+
+if [[ $# -ne 5 || $1 -lt 1 || $1 -gt 5 || $2 -lt 1 || $2 -gt 5 || $3 -lt 1 || $3 -gt 5 || $4 -lt 1 || $4 -gt 5 || $5 -lt 1 || $5 -gt 5 || $1 -eq $2 || $1 -eq $3 || $1 -eq $4 || $1 -eq $5 || $2 -eq $3 || $2 -eq $4 || $2 -eq $5 || $3 -eq $4 || $3 -eq $5 || $4 -eq $5 ]]; then cat <<END
+
+Usage: $(basename $0) a b c d e
+
+This script generates a Blocknet 3 of 5 multisig address where 
+ * a,b,c,d and e are numbers between 1 and 5 inclusive
+ * a,b,c,d and e are indices into an array of public keys
+ * each number between 1 and 5 can be used only once
+ * the order of the keys (and their values) determines the generated address
+ * the public keys are
+    ${pubk[0]}
+    ${pubk[1]}
+    ${pubk[2]}
+    ${pubk[3]}
+    ${pubk[4]}
+
+END
+exit
+fi 
+
+blocknet-cli -named createmultisig nrequired=3 keys='''["'${pubk[$(($1 - 1))]}'","'${pubk[$(($2 - 1))]}'","'${pubk[$(($3 - 1))]}'","'${pubk[$(($4 - 1))]}'","'${pubk[$(($5 - 1))]}'"]'''
+

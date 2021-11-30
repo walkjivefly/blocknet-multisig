@@ -1,0 +1,73 @@
+#!/bin/bash
+sign=0
+liquidity_address="CTNq1KarBgQKZeDMdvj6pfB3tMH9arQspM"
+while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
+  -s | --sign )
+    sign=1
+    ;;
+  -n | --nosign )
+    sign=0
+    ;;
+esac; shift; done
+if [[ "$1" == "--" ]]; then shift; fi
+if [[ $# -lt 4 || $# -gt 5 ]]; then cat <<END
+
+Usage: $(basename $0) [-sign] txid vout destination amount [change_address]
+
+This script generates a raw transaction to spend from a particular UTXO. It
+is expected that the UTXO is found in a multisig address to which the user
+has one of the spending keys.
+ 
+ * txid and vout identify the source of funds from which to spend
+ * amount BLOCK to
+ * destination
+ * change_address is optional and defaults to the "liquidity" multisig
+   address ($liquidity_address).
+
+END
+exit
+fi 
+
+if [[ $sign == 1 ]]; then
+  fully_unlocked=$(blocknet-cli getstakingstatus | jq -r .fullyunlocked)
+  if [[ $fully_unlocked != "true" ]]; then
+    echo
+    echo "Wallet must be fully unlocked to sign the transaction"
+    echo
+    exit
+  fi
+fi
+
+utxo_txid=$1
+utxo_vout=$2
+dest=$3
+amount=$4
+change_address=$5
+[[ -z $5 ]] && change_address=$liquidity_address
+
+available=$(blocknet-cli getrawtransaction $1 1 |jq -r .vout[$2].value)
+fee=0.001
+spend=$(echo $amount+$fee | bc -l)
+change_amount=$(echo $available-$spend | bc -l)
+
+echo
+echo "Available:" $available
+echo "   Amount:" $amount
+echo "       to:" $dest
+echo "      Fee:" $fee
+echo "   Change:" $change_amount
+echo "       to:" $change_address
+echo
+
+rawtx=$(blocknet-cli -named createrawtransaction inputs='''[ { "txid": "'$utxo_txid'", "vout": '$utxo_vout' } ]''' outputs='''{ "'$dest'": "'$amount'", "'$change_address'": "'$change_amount'"}''') && blocknet-cli decoderawtransaction $rawtx
+
+if [[ -n $rawtx && $sign == 1 ]]; then
+  result=$(blocknet-cli -named signrawtransactionwithwallet hexstring=$rawtx)
+  hex=$(echo $result | jq -r .hex)
+  error=$(echo $result | jq -r .errors[0].error)
+  echo
+  echo "Message:" $error
+  echo "Signed hex:"
+  echo $hex
+  echo
+fi 
